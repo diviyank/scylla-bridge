@@ -209,7 +209,7 @@ class Select(Query):
         Tuple[str, List[Any]]
             The query string and the corresponding parameters.
         """
-        query = f"SELECT {'DISTINCT' if self.distinct else ''} {self._select} FROM {self._keyspace}.{self._table}"
+        query = f"SELECT {'DISTINCT' if self._distinct else ''} {self._select} FROM {self._keyspace}.{self._table}"
         parameters = []
         if self._where:
             predicates = []
