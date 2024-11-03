@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Dict, ForwardRef, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 from loguru import logger
 from pydantic import ConfigDict, validate_call
@@ -12,11 +12,6 @@ from scyllaft import Scylla
 
 from .column import AggregateExpr, Column, ColumnExpr
 from .table import Table
-
-Select = ForwardRef("Select")  # type:ignore
-Insert = ForwardRef("Insert")  # type:ignore
-Update = ForwardRef("Update")  # type:ignore
-Delete = ForwardRef("Delete")  # type:ignore
 
 
 class Query(ABC):
@@ -241,7 +236,7 @@ class Update(Query):
         self._table = table
         self._keyspace = table.__keyspace__
         self._where: List[ColumnExpr] = []
-        self._set_values: Dict[Column, Any] = {}
+        self._set_values: Dict[str, Any] = {}
 
     @validate_call
     def set(self, column: Column, value: Any) -> Update:
@@ -259,7 +254,8 @@ class Update(Query):
         Update
             The updated Update query with the new SET values.
         """
-        self._set_values[column] = value
+        assert column._name != None, "Column is not associated with a table!"
+        self._set_values[column._name] = value
         return self
 
     @validate_call
@@ -279,7 +275,7 @@ class Update(Query):
         assert len(predicates) > 0, "where condition cannot be empty!"
         assert all(
             [
-                (predicate._table == self._table)
+                (predicate._table == self._table.__tablename__)
                 and (predicate._keyspace == self._keyspace)
                 for predicate in predicates
             ]
@@ -302,7 +298,7 @@ class Update(Query):
 
         for key, value in self._set_values.items():
 
-            set_keys.append(f"{key._name} = ?")
+            set_keys.append(f"{key} = ?")
             parameters.append(value)
 
         set_values = ", ".join(set_keys)
@@ -362,7 +358,7 @@ class Delete(Query):
         assert len(predicates) > 0, "where condition cannot be empty!"
         assert all(
             [
-                (predicate._table == self._table)
+                (predicate._table == self._table.__tablename__)
                 and (predicate._keyspace == self._keyspace)
                 for predicate in predicates
             ]
@@ -440,7 +436,10 @@ class Insert(Query):
         for stmt in self._values:
             c, v = zip(*stmt.items())
             queries.append(
-                (f"{query} ({', '.join(c)}) VALUES ({', '.join(['?' for i in c])})", v)
+                (
+                    f"{query} ({', '.join(c)}) VALUES ({', '.join(['?' for i in c])})",
+                    list(v),
+                )
             )
         if not queries:
             raise ValueError("No data to insert!")
